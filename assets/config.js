@@ -5,8 +5,8 @@ window.APP_CONFIG = {
   SUPABASE_URL: "https://jgfwjplhdllbwiujagxk.supabase.co",
   SUPABASE_ANON_KEY: "sb_publishable_mr9xBmO-0WEfSrV2qvlTBA_oyOJTgo0",
 
-  // 토스 "테스트 클라이언트 키" (문서용 테스트 키). 공개돼도 안전.
-  TOSS_CLIENT_KEY: "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm",
+  // 토스 "테스트 클라이언트 키" (API 개별 연동, 문서용 테스트 키). 공개돼도 안전.
+  TOSS_CLIENT_KEY: "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq",
 
   ADMIN_EMAIL: "admin@admin.com",
 };
