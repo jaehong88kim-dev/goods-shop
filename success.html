@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>결제 확인 · 굿즈샵</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <script src="assets/config.js"></script>
+</head>
+<body>
+  <header id="app-header"></header>
+  <main>
+    <div class="panel" style="text-align:center;">
+      <h1 id="title" style="margin-top:0;">결제 승인 중...</h1>
+      <p id="msg" class="msg"></p>
+      <div id="actions" style="display:none; margin-top:16px;">
+        <a class="btn" href="history.html">내 결제내역 보기</a>
+        <a class="btn" href="index.html" style="background:#6b7280;">쇼핑 계속하기</a>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { supabase, requireLogin, renderHeader, formatKRW } from "./assets/supabase.js";
+
+    renderHeader();
+
+    const title = document.getElementById("title");
+    const msg = document.getElementById("msg");
+    const actions = document.getElementById("actions");
+
+    const session = await requireLogin();
+    if (!session) throw new Error("redirecting to login");
+
+    const qs = new URLSearchParams(location.search);
+    const paymentKey = qs.get("paymentKey");
+    const orderId = qs.get("orderId");
+    const amount = Number(qs.get("amount"));
+
+    // 결제창 호출 직전 저장한 정보에서 productId 복구
+    const pending = JSON.parse(localStorage.getItem("pendingOrder") ?? "null");
+
+    function fail(text) {
+      title.textContent = "결제 확인 실패";
+      msg.className = "msg error";
+      msg.textContent = text;
+      actions.style.display = "block";
+    }
+
+    if (!paymentKey || !orderId || !amount) {
+      fail("결제 정보가 올바르지 않습니다.");
+    } else if (!pending || pending.orderId !== orderId) {
+      fail("주문 정보를 찾을 수 없습니다. 다시 시도해 주세요.");
+    } else if (pending.amount !== amount) {
+      // 토스 가이드: 쿼리의 amount 와 요청 amount 가 같은지 확인
+      fail("결제 금액이 일치하지 않습니다.");
+    } else {
+      // Edge Function 으로 서버 승인 요청
+      const res = await fetch(`${window.APP_CONFIG.SUPABASE_URL}/functions/v1/confirm-payment`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ paymentKey, orderId, amount, productId: pending.productId }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        fail(data.error ?? "결제 승인에 실패했습니다.");
+      } else {
+        localStorage.removeItem("pendingOrder");
+        title.textContent = "✅ 결제가 완료되었습니다";
+        msg.className = "msg ok";
+        msg.textContent = `${data.orderName} / ${formatKRW(data.amount)}`;
+        actions.style.display = "block";
+      }
+    }
+  </script>
+</body>
+</html>

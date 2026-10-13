@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>내 결제내역 · 굿즈샵</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <script src="assets/config.js"></script>
+</head>
+<body>
+  <header id="app-header"></header>
+  <main>
+    <h1>내 결제내역</h1>
+    <div id="content"></div>
+  </main>
+
+  <script type="module">
+    import { supabase, requireLogin, renderHeader, formatKRW } from "./assets/supabase.js";
+
+    renderHeader();
+    const session = await requireLogin();
+    if (!session) throw new Error("redirecting to login");
+
+    const content = document.getElementById("content");
+
+    // RLS 로 본인 결제만 조회됨
+    const { data: rows, error } = await supabase
+      .from("payments")
+      .select("created_at, product_name, amount, status, order_id")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      content.innerHTML = `<p class="empty">불러오기 실패: ${error.message}</p>`;
+    } else if (!rows.length) {
+      content.innerHTML = `<p class="empty">아직 결제 내역이 없습니다.</p>`;
+    } else {
+      content.innerHTML = `
+        <table>
+          <thead>
+            <tr><th>결제일시</th><th>상품</th><th>금액</th><th>상태</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map((r) => `
+              <tr>
+                <td>${new Date(r.created_at).toLocaleString("ko-KR")}</td>
+                <td>${r.product_name ?? "-"}</td>
+                <td>${formatKRW(r.amount)}</td>
+                <td><span class="badge">${r.status ?? "-"}</span></td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+    }
+  </script>
+</body>
+</html>

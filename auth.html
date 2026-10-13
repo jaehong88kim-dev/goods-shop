@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>로그인 / 회원가입 · 굿즈샵</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <script src="assets/config.js"></script>
+</head>
+<body>
+  <header id="app-header"></header>
+  <main>
+    <div class="panel">
+      <h1 id="title" style="text-align:center; margin-top:0;">로그인</h1>
+      <div class="field">
+        <label for="email">이메일</label>
+        <input id="email" type="email" placeholder="you@example.com" />
+      </div>
+      <div class="field">
+        <label for="password">비밀번호</label>
+        <input id="password" type="password" placeholder="비밀번호" />
+      </div>
+      <button id="submit" class="btn btn-block">로그인</button>
+      <p id="msg" class="msg"></p>
+      <div class="toggle">
+        <span id="toggle-text">계정이 없으신가요?</span>
+        <a id="toggle-link">회원가입</a>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { supabase, renderHeader } from "./assets/supabase.js";
+
+    renderHeader();
+
+    let mode = "login"; // 'login' | 'signup'
+    const title = document.getElementById("title");
+    const submit = document.getElementById("submit");
+    const toggleText = document.getElementById("toggle-text");
+    const toggleLink = document.getElementById("toggle-link");
+    const msg = document.getElementById("msg");
+    const emailEl = document.getElementById("email");
+    const pwEl = document.getElementById("password");
+
+    function setMode(m) {
+      mode = m;
+      const isLogin = m === "login";
+      title.textContent = isLogin ? "로그인" : "회원가입";
+      submit.textContent = isLogin ? "로그인" : "회원가입";
+      toggleText.textContent = isLogin ? "계정이 없으신가요?" : "이미 계정이 있으신가요?";
+      toggleLink.textContent = isLogin ? "회원가입" : "로그인";
+      msg.textContent = "";
+    }
+    toggleLink.addEventListener("click", () => setMode(mode === "login" ? "signup" : "login"));
+
+    submit.addEventListener("click", async () => {
+      const email = emailEl.value.trim();
+      const password = pwEl.value;
+      if (!email || !password) {
+        msg.className = "msg error";
+        msg.textContent = "이메일과 비밀번호를 입력하세요.";
+        return;
+      }
+      submit.disabled = true;
+      msg.className = "msg";
+      msg.textContent = "처리 중...";
+
+      const fn = mode === "login"
+        ? supabase.auth.signInWithPassword({ email, password })
+        : supabase.auth.signUp({ email, password });
+      const { data, error } = await fn;
+
+      submit.disabled = false;
+      if (error) {
+        msg.className = "msg error";
+        msg.textContent = error.message;
+        return;
+      }
+      if (!data.session) {
+        // 이메일 인증이 켜져 있으면 세션이 바로 안 생김 (이 프로젝트는 인증 OFF 전제)
+        msg.className = "msg ok";
+        msg.textContent = "가입되었습니다. 이제 로그인해 주세요.";
+        setMode("login");
+        return;
+      }
+      location.href = "index.html";
+    });
+  </script>
+</body>
+</html>

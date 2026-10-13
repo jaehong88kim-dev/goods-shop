@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>관리자 · 굿즈샵</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <script src="assets/config.js"></script>
+</head>
+<body>
+  <header id="app-header"></header>
+  <main>
+    <h1>관리자 · 전체 결제내역</h1>
+    <div id="content"></div>
+  </main>
+
+  <script type="module">
+    import { supabase, requireLogin, renderHeader, formatKRW } from "./assets/supabase.js";
+
+    renderHeader();
+    const session = await requireLogin();
+    if (!session) throw new Error("redirecting to login");
+
+    const content = document.getElementById("content");
+
+    // 관리자 판별 (클라이언트 1차 차단, 실제 데이터 보호는 RLS 가 담당)
+    if (session.user.email !== window.APP_CONFIG.ADMIN_EMAIL) {
+      content.innerHTML = `<p class="empty">접근 권한이 없습니다. 관리자 계정으로 로그인하세요.</p>`;
+      throw new Error("not admin");
+    }
+
+    // RLS: admin@admin.com 은 모든 결제 조회 가능
+    const { data: rows, error } = await supabase
+      .from("payments")
+      .select("created_at, user_email, product_name, amount, status, order_id")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      content.innerHTML = `<p class="empty">불러오기 실패: ${error.message}</p>`;
+    } else if (!rows.length) {
+      content.innerHTML = `<p class="empty">결제 내역이 없습니다.</p>`;
+    } else {
+      const total = rows.reduce((s, r) => s + r.amount, 0);
+      content.innerHTML = `
+        <p style="color:var(--muted);">총 ${rows.length}건 · 합계 ${formatKRW(total)}</p>
+        <table>
+          <thead>
+            <tr><th>결제일시</th><th>구매자</th><th>상품</th><th>금액</th><th>상태</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map((r) => `
+              <tr>
+                <td>${new Date(r.created_at).toLocaleString("ko-KR")}</td>
+                <td>${r.user_email ?? "-"}</td>
+                <td>${r.product_name ?? "-"}</td>
+                <td>${formatKRW(r.amount)}</td>
+                <td><span class="badge">${r.status ?? "-"}</span></td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+    }
+  </script>
+</body>
+</html>

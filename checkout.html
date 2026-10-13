@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>결제 · 굿즈샵</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <script src="assets/config.js"></script>
+  <!-- 토스페이먼츠 V2 결제 SDK -->
+  <script src="https://js.tosspayments.com/v2/standard"></script>
+</head>
+<body>
+  <header id="app-header"></header>
+  <main>
+    <div class="panel">
+      <h1 style="margin-top:0;">결제</h1>
+      <div id="product"></div>
+      <button id="pay" class="btn btn-block" style="margin-top:16px;" disabled>결제하기</button>
+      <p id="msg" class="msg"></p>
+    </div>
+  </main>
+
+  <script type="module">
+    import { supabase, requireLogin, renderHeader, formatKRW } from "./assets/supabase.js";
+
+    renderHeader();
+
+    const msg = document.getElementById("msg");
+    const payBtn = document.getElementById("pay");
+    const productBox = document.getElementById("product");
+
+    const session = await requireLogin();
+    if (!session) throw new Error("redirecting to login");
+
+    const productId = new URLSearchParams(location.search).get("productId");
+    if (!productId) {
+      msg.className = "msg error";
+      msg.textContent = "상품 정보가 없습니다.";
+      throw new Error("no product");
+    }
+
+    const { data: product, error } = await supabase
+      .from("products").select("*").eq("id", productId).single();
+    if (error || !product) {
+      msg.className = "msg error";
+      msg.textContent = "상품을 불러오지 못했습니다.";
+      throw new Error("product not found");
+    }
+
+    productBox.innerHTML = `
+      <img src="${product.image_url ?? ""}" alt="${product.name}" style="width:100%;height:200px;object-fit:cover;border-radius:8px;" />
+      <h2 style="margin:12px 0 4px;">${product.name}</h2>
+      <p style="color:var(--muted);">${product.description ?? ""}</p>
+      <p class="price" style="font-size:22px;font-weight:700;color:var(--primary);">${formatKRW(product.price)}</p>`;
+
+    // 토스 결제 객체 초기화
+    const tossPayments = TossPayments(window.APP_CONFIG.TOSS_CLIENT_KEY);
+    const payment = tossPayments.payment({ customerKey: session.user.id });
+
+    payBtn.disabled = false;
+    payBtn.addEventListener("click", async () => {
+      payBtn.disabled = true;
+      msg.textContent = "";
+
+      // 고유 주문번호 (영문/숫자/-,_ 6~64자)
+      const orderId = "order_" + crypto.randomUUID().replace(/-/g, "");
+
+      // 리다이렉트 후 success.html 에서 쓸 정보 저장
+      localStorage.setItem("pendingOrder", JSON.stringify({
+        orderId, productId: product.id, amount: product.price,
+      }));
+
+      try {
+        await payment.requestPayment({
+          method: "CARD",
+          amount: { currency: "KRW", value: product.price },
+          orderId,
+          orderName: product.name,
+          successUrl: new URL("success.html", location.href).href,
+          failUrl: new URL("fail.html", location.href).href,
+          customerEmail: session.user.email,
+          card: { useEscrow: false, flowMode: "DEFAULT", useCardPoint: false, useAppCardOnly: false },
+        });
+      } catch (e) {
+        // 사용자가 창을 닫는 등 요청 자체가 실패한 경우
+        payBtn.disabled = false;
+        msg.className = "msg error";
+        msg.textContent = "결제를 시작하지 못했습니다: " + (e?.message ?? e);
+      }
+    });
+  </script>
+</body>
+</html>

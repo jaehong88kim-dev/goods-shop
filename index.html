@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>굿즈샵</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <script src="assets/config.js"></script>
+</head>
+<body>
+  <header id="app-header"></header>
+  <main>
+    <h1>굿즈 목록</h1>
+    <div id="products" class="grid"></div>
+    <p id="status" class="empty">상품을 불러오는 중...</p>
+  </main>
+
+  <script type="module">
+    import { supabase, renderHeader, formatKRW } from "./assets/supabase.js";
+
+    renderHeader();
+
+    const list = document.getElementById("products");
+    const status = document.getElementById("status");
+
+    const { data: products, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("price");
+
+    if (error) {
+      status.textContent = "상품을 불러오지 못했습니다: " + error.message;
+    } else if (!products.length) {
+      status.textContent = "등록된 상품이 없습니다.";
+    } else {
+      status.style.display = "none";
+      list.innerHTML = products.map((p) => `
+        <div class="card">
+          <img src="${p.image_url ?? ""}" alt="${p.name}" />
+          <div class="body">
+            <div class="name">${p.name}</div>
+            <div class="desc">${p.description ?? ""}</div>
+            <div class="price">${formatKRW(p.price)}</div>
+            <a class="btn btn-block" href="checkout.html?productId=${p.id}">구매하기</a>
+          </div>
+        </div>`).join("");
+    }
+  </script>
+</body>
+</html>
